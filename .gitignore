@@ -1,1 +1,5 @@
-test
+bazel-*
+.cache
+external
+compile_commands.json
+MODULE.*
