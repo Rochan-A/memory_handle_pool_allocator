@@ -1,0 +1,20 @@
+module(name = "handle_pool")
+
+# https://registry.bazel.build/modules/googletest
+bazel_dep(name = "googletest", version = "1.15.2")
+
+# Hedron's Compile Commands Extractor for Bazel
+# https://github.com/hedronvision/bazel-compile-commands-extractor
+bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
+git_override(
+    module_name = "hedron_compile_commands",
+    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
+    commit = "0e990032f3c5a866e72615cf67e5ce22186dcb97",
+)
+
+bazel_dep(name = "read_write_locks", dev_dependency = True)
+git_override(
+    module_name = "read_write_locks",
+    remote = "https://github.com/Rochan-A/pthread-read-write-locks.git",
+    commit = "b146e0622fd6e0f78599d37303417acea51df1cd"
+)
