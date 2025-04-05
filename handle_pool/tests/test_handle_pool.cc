@@ -6,17 +6,35 @@
 
 #include "handle_pool/handle_pool.h"
 
-struct TestObject {
+struct TestStruct {
   int elem;
+  static int constructor_count;
+  static int destructor_count;
 
-  TestObject() : elem(0) {}
+  explicit TestStruct() : elem(0) { ++constructor_count; }
 
-  explicit TestObject(const int &elem) : elem(elem) {}
+  explicit TestStruct(const int &elem) : elem(elem) { ++constructor_count; }
+
+  TestStruct(const TestStruct &other) : elem(other.elem) {
+    ++constructor_count;
+  }
+  TestStruct(TestStruct &&other) noexcept : elem(other.elem) {
+    ++constructor_count;
+  }
+  ~TestStruct() { ++destructor_count; }
+
+  TestStruct &operator=(const TestStruct &) = default;
+  TestStruct &operator=(TestStruct &&) = default;
 };
 
+int TestStruct::constructor_count = 0;
+int TestStruct::destructor_count = 0;
+
 TEST(HandlePoolTest, BasicFunctionalityTest) {
-  handle_pool::HandlePool<TestObject, 1> test_pool;
+  handle_pool::HandlePool<TestStruct, 1> test_pool;
   EXPECT_EQ(test_pool.Capacity(), 1);
+  EXPECT_TRUE(test_pool.Empty());
+  EXPECT_EQ(test_pool.Free(), 1);
 
   const handle_pool::Handle handle1 = test_pool.Create(10);
 
@@ -25,20 +43,22 @@ TEST(HandlePoolTest, BasicFunctionalityTest) {
 
   // Validate handle1 usage.
   EXPECT_TRUE(test_pool.IsValid(handle1));
-  EXPECT_TRUE(test_pool.Get(handle1).has_value());
-  EXPECT_EQ(test_pool.Get(handle1).value().get().elem, 10);
+  auto obj = test_pool.Get(handle1);
+  EXPECT_TRUE(obj.has_value());
+  EXPECT_EQ(obj.value().get().elem, 10);
 
   // Validate destroying object referenced by handle1.
   EXPECT_TRUE(test_pool.Destroy(handle1));
-  EXPECT_FALSE(test_pool.Get(handle1).has_value());
-  EXPECT_EQ(test_pool.Get(handle1), std::nullopt);
+  obj = test_pool.Get(handle1);
+  EXPECT_FALSE(obj.has_value());
+  EXPECT_EQ(obj, std::nullopt);
 
   EXPECT_EQ(test_pool.Free(), 1);
   EXPECT_TRUE(test_pool.Empty());
 }
 
 TEST(HandlePoolTest, ModifyItemTest) {
-  handle_pool::HandlePool<TestObject, 1> test_pool;
+  handle_pool::HandlePool<TestStruct, 1> test_pool;
 
   handle_pool::Handle handle1 = test_pool.Create(10);
 
@@ -63,7 +83,7 @@ TEST(HandlePoolTest, ModifyItemTest) {
 }
 
 TEST(HandlePoolTest, DanglingUseOfInvalidHandleTest) {
-  handle_pool::HandlePool<TestObject, 1> test_pool;
+  handle_pool::HandlePool<TestStruct, 1> test_pool;
 
   handle_pool::Handle handle1 = test_pool.Create(10);
   // Destroy handle
@@ -85,7 +105,7 @@ TEST(HandlePoolTest, DanglingUseOfInvalidHandleTest) {
 }
 
 TEST(HandlePoolTest, ReuseSlotTest) {
-  handle_pool::HandlePool<TestObject, 2> test_pool;
+  handle_pool::HandlePool<TestStruct, 2> test_pool;
 
   handle_pool::Handle handle1 = test_pool.Create(10);
   handle_pool::Handle handle2 = test_pool.Create(20);
