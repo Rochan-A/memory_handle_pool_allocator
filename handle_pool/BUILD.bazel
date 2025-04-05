@@ -3,6 +3,8 @@ cc_library(
     hdrs = ["handle_pool.h"],
     deps = [
         "@read_write_locks//rwlock:rw_lock",
+        "@read_write_locks//rwlock:shared_lock",
+        "@read_write_locks//rwlock:unique_lock",
     ],
     visibility = ["//visibility:public"],
 )

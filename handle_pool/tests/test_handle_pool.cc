@@ -2,131 +2,129 @@
 #include <iostream>
 
 #include <gtest/gtest.h>
+#include <optional>
 
 #include "handle_pool/handle_pool.h"
 
 struct TestObject {
-  int x_;
+  int elem;
 
-  TestObject() : x_(0) {}
+  TestObject() : elem(0) {}
 
-  explicit TestObject(int val) : x_(val) {
-    std::cout << "[TestObject ctor] x=" << x_ << "\n";
-  }
-
-  ~TestObject() { std::cout << "[TestObject dtor] x=" << x_ << "\n"; }
+  explicit TestObject(const int &elem) : elem(elem) {}
 };
 
-TEST(SomeTest, TestA) {
-  // TODO
-  // mem_handle::HandlePool<TestObject, 4> test_pool;
+TEST(HandlePoolTest, BasicFunctionalityTest) {
+  handle_pool::HandlePool<TestObject, 1> test_pool;
+  EXPECT_EQ(test_pool.Capacity(), 1);
 
-  // mem_handle::Handle handle1 = test_pool.Create(10);
-  // mem_handle::Handle handle2 = test_pool.Create(20);
-  // mem_handle::Handle handle3 = test_pool.Create(30);
+  const handle_pool::Handle handle1 = test_pool.Create(10);
 
-  // std::cout << "Created handles:\n"
-  //           << "  handle1 = " << handle1 << "\n"
-  //           << "  handle2 = " << handle2 << "\n"
-  //           << "  handle3 = " << handle3 << "\n\n";
+  EXPECT_FALSE(test_pool.Empty());
+  EXPECT_EQ(test_pool.Free(), 0);
 
-  // // Use short-lived pointers for reading/writing
-  // auto obj = test_pool.Get(handle1);
-  // if (obj.has_value()) {
-  //   std::cout << "handle1 points to object with x_=" << obj.value()->x_ <<
-  //   "\n"; obj.value()->x_ = 999; // modify
-  // } else {
-  //   std::cout << "ERROR: handle1 invalid immediately after creation.\n";
-  // }
+  // Validate handle1 usage.
+  EXPECT_TRUE(test_pool.IsValid(handle1));
+  EXPECT_TRUE(test_pool.Get(handle1).has_value());
+  EXPECT_EQ(test_pool.Get(handle1).value().get().elem, 10);
 
-  // // Destroy handle2
-  // std::cout << "\nDestroying handle2...\n";
-  // test_pool.Destroy(handle2);
+  // Validate destroying object referenced by handle1.
+  EXPECT_TRUE(test_pool.Destroy(handle1));
+  EXPECT_FALSE(test_pool.Get(handle1).has_value());
+  EXPECT_EQ(test_pool.Get(handle1), std::nullopt);
 
-  // // After destruction, handle2 should be invalid
-  // assert(!test_pool.IsValid(handle2) &&
-  //        "handle2 should be invalid immediately after destruction!");
+  EXPECT_EQ(test_pool.Free(), 1);
+  EXPECT_TRUE(test_pool.Empty());
+}
 
-  // // "dangling" usage of handle2: Get() should return nullptr
-  // auto obj2 = test_pool.Get(handle2);
-  // if (obj2.has_value()) {
-  //   // Should never happen if the generation check is correct
-  //   std::cout << "ERROR: We got a valid pointer for a destroyed handle!\n";
-  // } else {
-  //   std::cout << "OK: handle2 is now invalid and returns nullptr\n";
-  // }
+TEST(HandlePoolTest, ModifyItemTest) {
+  handle_pool::HandlePool<TestObject, 1> test_pool;
 
-  // // Reuse handle2's slot
-  // std::cout << "\nCreating new object (reuse handle2's slot)...\n";
-  // mem_handle::Handle handle4 = test_pool.Create(1234);
+  handle_pool::Handle handle1 = test_pool.Create(10);
 
-  // std::cout << "  handle4 = " << handle4 << "\n";
-  // auto obj4 = test_pool.Get(handle4);
-  // if (obj4.has_value()) {
-  //   std::cout << "  handle4 points to object with x_=" << obj4.value()->x_
-  //             << "\n";
-  // } else {
-  //   std::cout << "ERROR: handle4 not valid right after creation.\n";
-  // }
+  EXPECT_TRUE(test_pool.IsValid(handle1));
+  auto obj = test_pool.Get(handle1);
+  EXPECT_TRUE(obj.has_value());
+  EXPECT_EQ(obj.value().get().elem, 10);
 
-  // // Ensure handle1 is still valid, and read the updated value
-  // auto obj1 = test_pool.Get(handle1);
-  // if (obj1.has_value()) {
-  //   std::cout << "  handle1 (still valid) points to x_=" << obj1.value()->x_
-  //             << "\n";
-  //   assert(obj1.value()->x_ == 999 &&
-  //          "handle1's object should retain the updated value 999");
-  // } else {
-  //   std::cout << "ERROR: handle1 unexpectedly invalid.\n";
-  // }
+  obj.value().get().elem = 999;
 
-  // // Destroy everything
-  // std::cout << "\nDestroying handle1, handle3, handle4...\n";
-  // test_pool.Destroy(handle1);
-  // test_pool.Destroy(handle3);
-  // test_pool.Destroy(handle4);
+  {
+    // Retrieve again and update
+    auto obj2 = test_pool.Get(handle1);
+    EXPECT_TRUE(obj2.has_value());
+    EXPECT_EQ(obj2.value().get().elem, 999);
 
-  // // handle3 or handle4 are now destroyed, so Get() should be null.
-  // auto obj3 = test_pool.Get(handle3);
-  // auto obj4_again = test_pool.Get(handle4);
+    obj2.value().get().elem = 1000;
+  }
 
-  // std::cout << "handle3->Get() => "
-  //           << (obj3.has_value() ? "VALID (ERROR!)" : "nullptr (ok)") <<
-  //           "\n";
-  // std::cout << "handle4->Get() => "
-  //           << (obj4_again.has_value() ? "VALID (ERROR!)" : "nullptr (ok)")
-  //           << "\n";
+  // Original handle should have updated value.
+  EXPECT_EQ(obj.value().get().elem, 1000);
+}
 
-  // // Create more objects and fill up the pool
-  // std::cout << "\nTesting pool capacity usage...\n";
-  // std::vector<mem_handle::Handle> handles;
-  // handles.reserve(test_pool.Capacity());
-  // for (size_t i = 0; i < test_pool.Capacity(); ++i) {
-  //   mem_handle::Handle h = test_pool.Create(i * 100);
-  //   // If the pool is not full, we expect a valid handle
-  //   if (h.IsValid()) {
-  //     obj = test_pool.Get(h);
-  //     assert(obj.has_value() &&
-  //            "Object pointer should not be null after creation");
-  //     assert(obj.value()->x_ == static_cast<int>(i * 100) &&
-  //            "Object value mismatch in capacity test");
-  //     handles.push_back(h);
-  //   } else {
-  //     std::cout << "ERROR: Could not create a new object at iteration " << i
-  //               << ". The pool is unexpectedly full.\n";
-  //   }
-  // }
-  // // The pool should now be full; a subsequent Create should fail.
-  // mem_handle::Handle extra_handle = test_pool.Create(9999);
-  // if (extra_handle.IsValid()) {
-  //   std::cout << "ERROR: The pool unexpectedly allowed creation beyond "
-  //                "its capacity.\n";
-  // } else {
-  //   std::cout << "Good: The pool is full, further creation returns invalid.\n
-  //   ";
-  // }
+TEST(HandlePoolTest, DanglingUseOfInvalidHandleTest) {
+  handle_pool::HandlePool<TestObject, 1> test_pool;
 
-  // for (mem_handle::Handle h : handles) {
-  //   test_pool.Destroy(h);
-  // }
+  handle_pool::Handle handle1 = test_pool.Create(10);
+  // Destroy handle
+  test_pool.Destroy(handle1);
+
+  // After destruction, handle should be invalid
+  EXPECT_FALSE(test_pool.IsValid(handle1));
+
+  // "dangling" usage of handle to Get() should return nullopt
+  auto obj = test_pool.Get(handle1);
+  EXPECT_FALSE(obj.has_value());
+
+  // Call destroy again on handle, should be no-op.
+  test_pool.Destroy(handle1);
+
+  // "dangling" usage of handle to Get() should return nullopt
+  auto obj2 = test_pool.Get(handle1);
+  EXPECT_FALSE(obj2.has_value());
+}
+
+TEST(HandlePoolTest, ReuseSlotTest) {
+  handle_pool::HandlePool<TestObject, 2> test_pool;
+
+  handle_pool::Handle handle1 = test_pool.Create(10);
+  handle_pool::Handle handle2 = test_pool.Create(20);
+  auto obj2 = test_pool.Get(handle2);
+
+  // Pool is full.
+  EXPECT_EQ(test_pool.Free(), 0);
+
+  // Create() should return invalid Handle
+  handle_pool::Handle handle_invalid = test_pool.Create(40);
+  EXPECT_EQ(handle_pool::Handle::Invalid(), handle_invalid);
+
+  // Get()ing with invalid handle should be nullopt.
+  auto obj_invalid = test_pool.Get(handle_invalid);
+  EXPECT_FALSE(obj_invalid.has_value());
+
+  // Destroy handle1
+  test_pool.Destroy(handle1);
+  EXPECT_FALSE(test_pool.IsValid(handle1));
+
+  // Create new object that re-uses handle1's slot.
+  handle_pool::Handle handle3 = test_pool.Create(30);
+
+  // Pool is full again.
+  EXPECT_EQ(test_pool.Free(), 0);
+
+  auto obj3 = test_pool.Get(handle3);
+  EXPECT_TRUE(obj3.has_value());
+  EXPECT_EQ(obj3.value().get().elem, 30);
+
+  // Index is same but generation is different.
+  EXPECT_EQ(handle1.index, handle3.index);
+  EXPECT_NE(handle1.generation, handle3.generation);
+
+  // Ensure handle2 is still valid.
+  EXPECT_TRUE(obj2.has_value());
+  EXPECT_EQ(obj2.value().get().elem, 20);
+
+  // Ensure Get() on handle1 returns nullopt
+  auto obj1 = test_pool.Get(handle1);
+  EXPECT_FALSE(obj1.has_value());
 }
