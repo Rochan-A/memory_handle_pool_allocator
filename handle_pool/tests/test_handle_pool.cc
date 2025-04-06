@@ -31,7 +31,7 @@ int TestStruct::constructor_count = 0;
 int TestStruct::destructor_count = 0;
 
 TEST(HandlePoolTest, BasicFunctionalityTest) {
-  handle_pool::HandlePool<TestStruct, 1> test_pool;
+  handle_pool::HandlePool<TestStruct> test_pool(1);
   EXPECT_EQ(test_pool.Capacity(), 1);
   EXPECT_TRUE(test_pool.Empty());
   EXPECT_EQ(test_pool.Free(), 1);
@@ -58,7 +58,7 @@ TEST(HandlePoolTest, BasicFunctionalityTest) {
 }
 
 TEST(HandlePoolTest, ModifyItemTest) {
-  handle_pool::HandlePool<TestStruct, 1> test_pool;
+  handle_pool::HandlePool<TestStruct> test_pool(1);
 
   handle_pool::Handle handle1 = test_pool.Create(10);
 
@@ -83,7 +83,7 @@ TEST(HandlePoolTest, ModifyItemTest) {
 }
 
 TEST(HandlePoolTest, DanglingUseOfInvalidHandleTest) {
-  handle_pool::HandlePool<TestStruct, 1> test_pool;
+  handle_pool::HandlePool<TestStruct> test_pool(1);
 
   handle_pool::Handle handle1 = test_pool.Create(10);
   // Destroy handle
@@ -105,7 +105,7 @@ TEST(HandlePoolTest, DanglingUseOfInvalidHandleTest) {
 }
 
 TEST(HandlePoolTest, ReuseSlotTest) {
-  handle_pool::HandlePool<TestStruct, 2> test_pool;
+  handle_pool::HandlePool<TestStruct> test_pool(2);
 
   handle_pool::Handle handle1 = test_pool.Create(10);
   handle_pool::Handle handle2 = test_pool.Create(20);

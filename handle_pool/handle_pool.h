@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cassert>
 #include <cstdint>
 #include <cstdlib>
 #include <functional>
@@ -56,12 +57,13 @@ inline std::ostream &operator<<(std::ostream &os, const Handle &h) {
  * (unique_lock).
  * - `Get` uses a shared lock (shared_lock).
  */
-template <typename T, size_t kCapacity> class HandlePool {
+template <typename T> class HandlePool {
 public:
-  explicit HandlePool() {
-    static_assert(kCapacity > 0, "Capacity must be positive");
-    free_list_.reserve(kCapacity);
-    for (uint32_t i = 0; i < kCapacity; ++i) {
+  explicit HandlePool(const size_t capacity) : capacity_(capacity) {
+    assert(capacity_ > 0);
+    items_.reserve(capacity);
+    free_list_.reserve(capacity_);
+    for (uint32_t i = 0; i < capacity_; ++i) {
       items_[i].in_use = false;
       items_[i].generation = 0;
       free_list_.push_back(i);
@@ -150,12 +152,12 @@ public:
     return IsValidInternal(handle);
   }
 
-  inline constexpr size_t Capacity() const { return kCapacity; }
+  inline constexpr size_t Capacity() const { return capacity_; }
 
   // Returns true if there are no currently used slots.
   bool Empty() {
     rwlock::SharedLock l(rwlock_);
-    return (free_list_.size() == kCapacity);
+    return (free_list_.size() == capacity_);
   }
 
   // Returns how many free slots remain.
@@ -177,14 +179,16 @@ private:
 
   // Checks validity without locking (callers must hold a lock).
   const bool IsValidInternal(const Handle &handle) const {
-    if (handle.index >= kCapacity || handle == Handle::Invalid()) {
+    if (handle.index >= capacity_ || handle == Handle::Invalid()) {
       return false;
     }
     const Item &item = items_[handle.index];
     return item.in_use && (item.generation == handle.generation);
   }
 
-  std::array<Item, kCapacity> items_;
+  const size_t capacity_{0};
+
+  std::vector<Item> items_;
   std::vector<uint32_t> free_list_;
 
   // Protect all shared data (items_ and free_list_).
